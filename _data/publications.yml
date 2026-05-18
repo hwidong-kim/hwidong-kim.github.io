@@ -9,7 +9,7 @@ main:
   - title: "DAFT-GAN: Dual Affine Transformation Generative Adversarial Network for Text-Guided Image Inpainting"
     authors: Jihoon Lee*, Yunhong Min*, <b>Hwidong Kim*</b>, Sangtae Ahn<br>(* equal contributions)
     conference: ACM MM 2024
-    project: https://dual-affine-gan.github.io/daft-gan.github.io/
+    project: https://hwidong-kim.github.io/projects/DAFT-GAN/
     pdf: ./assets/files/DAFT-GAN.pdf
-    code: https://github.com/hdkim01/DAFT-GAN
+    code: https://github.com/hwidong-kim/DAFT-GAN
     image: ./assets/img/daft-gan.png
