@@ -1,37 +1,2342 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3DPhysVideo</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #ffffff;
-      color: #1a1a1a;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 24px;
-      -webkit-font-smoothing: antialiased;
-    }
-    h1 {
-      font-size: 2rem;
-      letter-spacing: -0.02em;
-      margin-bottom: 12px;
-    }
-    p {
-      color: #666;
-      font-size: 1.05rem;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="3DPhysVideo is a training-free pipeline that generates physically realistic videos from a single image by repurposing an image-to-video model for 3D reconstruction and simulation-guided video generation, powered by Consistency-Guided Flow SDE.">
+<meta property="og:title" content="3DPhysVideo: Consistency-Guided Flow SDE for Video Generation">
+<meta property="og:description" content="A training-free pipeline for physically realistic video generation from a single image.">
+<title>3DPhysVideo: Consistency-Guided Flow SDE for Video Generation</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=PT+Serif:wght@400;700&family=Libre+Baskerville:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+
+<style>
+/* ============================
+   CSS Variables — Sky Blue Theme
+   ============================ */
+:root {
+  --font-serif: 'PT Serif', serif;
+  --font-sans: 'Inter', sans-serif;
+  --font-prompt: 'Libre Baskerville', 'Times New Roman', serif;
+
+  --color-bg-main: #f5f9fd;
+  --color-bg-alt: #e8f1fa;
+  --color-text-main: #4a4a4a;
+  --color-text-heading: #1f2d3d;
+  --color-accent: #5a8ab8;
+  --color-accent-dark: #3a6c98;
+  --color-border: #cfdfee;
+  --color-white: #ffffff;
+
+  --content-max-width: 1600px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-main);
+  color: var(--color-text-main);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  color: var(--color-text-heading);
+  font-weight: 700;
+  margin: 0;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+  transition: color 0.3s ease;
+  font-weight: 500;
+}
+a:hover {
+  color: var(--color-accent-dark);
+  text-decoration: underline;
+}
+
+.container {
+  width: 100%;
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.container.is-fluid {
+  max-width: var(--content-max-width);
+}
+
+/* ============================
+   Navigation
+   ============================ */
+.header-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  padding: 1rem 2rem;
+  transition: background-color 0.4s ease, backdrop-filter 0.4s ease, box-shadow 0.4s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-nav.is-scrolled {
+  background-color: rgba(245, 249, 253, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.nav-title {
+  font-family: var(--font-serif);
+  font-variant: small-caps;
+  font-weight: 800;
+  letter-spacing: 0.005em;
+  font-size: 1.25rem;
+  color: var(--color-text-heading);
+}
+.nav-links a {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin-left: 1.5rem;
+  color: var(--color-text-main);
+  position: relative;
+  padding-bottom: 4px;
+}
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 0; height: 2px;
+  background-color: var(--color-accent);
+  transition: width 0.3s ease;
+}
+.nav-links a:hover { text-decoration: none; }
+.nav-links a:hover::after { width: 100%; }
+
+/* Nav dropdown (Comparison -> Full Pipeline / Stage 1 / Stage 2) */
+.nav-links .nav-dropdown {
+  display: inline-block;
+  position: relative;
+  margin-left: 1.5rem;
+}
+.nav-links .nav-dropdown > a {
+  margin-left: 0;
+}
+.nav-dropdown-caret {
+  font-size: 0.7em;
+  margin-left: 0.15em;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+.nav-dropdown:hover .nav-dropdown-caret,
+.nav-dropdown:focus-within .nav-dropdown-caret { transform: rotate(180deg); }
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  display: flex;
+  flex-direction: column;
+  background: rgba(245, 249, 253, 0.97);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-radius: 10px;
+  padding: 0.45rem 0;
+  box-shadow: 0 8px 24px rgba(31, 45, 61, 0.12);
+  border: 1px solid var(--color-border);
+  min-width: 150px;
+  z-index: 1001;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.nav-dropdown-menu a {
+  margin: 0;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.9rem;
+  color: var(--color-text-main);
+  text-align: left;
+  border-radius: 0;
+}
+.nav-dropdown-menu a::after { display: none; }
+.nav-dropdown-menu a:hover {
+  background: var(--color-bg-alt);
+  color: var(--color-accent-dark);
+}
+
+/* ============================
+   Hero / Publication header
+   ============================ */
+.hero { background-color: transparent; }
+.publication-header { padding: 7rem 1.5rem 1rem; text-align: center; }
+
+.publication-title {
+  font-family: var(--font-serif);
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text-heading);
+  margin: 0 auto 1.75rem;
+  max-width: 1000px;
+}
+
+/* Stylized brand mark — small-caps + symmetric (dark→mid→dark) gradient. */
+.title-brand {
+  font-family: var(--font-serif);
+  font-variant: small-caps;
+  font-weight: 800;
+  letter-spacing: 0.005em;
+  background: linear-gradient(90deg,
+    #4477a8 0%,
+    #1c2f4c 50%,
+    #4477a8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: #15263c; /* fallback */
+}
+
+.publication-authors {
+  font-family: var(--font-sans);
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+.author-block {
+  display: inline-block;
+  margin: 0 0.5rem;
+}
+.publication-authors a {
+  color: var(--color-accent);
+  font-weight: 600;
+  position: relative;
+}
+.publication-authors a::after {
+  content: '';
+  position: absolute;
+  width: 0; height: 2px;
+  bottom: -2px; left: 0;
+  background-color: var(--color-accent);
+  transition: width 0.3s ease;
+}
+.publication-authors a:hover { text-decoration: none; }
+.publication-authors a:hover::after { width: 100%; }
+.eql { font-size: 0.85em; vertical-align: super; }
+
+.publication-affiliation {
+  font-family: var(--font-sans);
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+}
+.publication-venue {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--color-accent-dark);
+  margin-bottom: 1.5rem;
+}
+
+.publication-links { margin-top: 1.5rem; }
+.link-block { display: inline-block; margin: 0.25rem; }
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #1f2d3d;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 0.7rem 1.25rem;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.25s ease, transform 0.25s ease;
+}
+.button:hover {
+  background-color: #2c3e54;
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+/* ============================
+   Teaser
+   ============================ */
+.teaser { background-color: var(--color-bg-main); padding: 1.5rem 1.5rem 3rem; }
+
+/* Spotlight teaser: cursor-following lens that reveals physics videos */
+.teaser-spotlight {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 1rem auto;
+  aspect-ratio: 1672 / 941;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(31, 45, 61, 0.12);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-white);
+}
+.teaser-base {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.teaser-region {
+  position: absolute;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  /* Slight inward scale + opacity fade so the video "settles in" at its
+     pre-aligned position. Scale is small (0.985→1) to keep alignment crisp. */
+  transform: scale(0.985);
+  transform-origin: center;
+  transition:
+    opacity 0.22s ease-out,
+    transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.teaser-region.is-active {
+  opacity: 1;
+  transform: scale(1);
+}
+.teaser-marker {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 3;
+  animation: teaser-marker-pulse 2.6s ease-in-out infinite;
+}
+@keyframes teaser-marker-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 4px rgba(90, 138, 184, 0.45),
+      0 2px 8px rgba(0, 0, 0, 0.22);
+  }
+  50% {
+    box-shadow:
+      0 0 0 12px rgba(90, 138, 184, 0.0),
+      0 2px 8px rgba(0, 0, 0, 0.22);
+  }
+}
+.teaser-spotlight.is-playing .teaser-marker {
+  opacity: 0.25;
+  transition: opacity 0.6s ease;
+}
+.teaser-callout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto 1.4rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 1rem;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(58, 108, 152, 0.30);
+  animation: teaser-callout-glow 2.6s ease-in-out infinite;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.teaser-callout-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.teaser-callout-text {
+  white-space: normal;
+  line-height: 1.4;
+}
+.teaser-callout-arrow {
+  display: inline-block;
+  font-size: 1.15rem;
+  font-weight: 700;
+  animation: teaser-callout-arrow 1.4s ease-in-out infinite;
+}
+@keyframes teaser-callout-glow {
+  0%, 100% { box-shadow: 0 6px 20px rgba(58, 108, 152, 0.28); }
+  50%      { box-shadow: 0 12px 32px rgba(58, 108, 152, 0.50); }
+}
+@keyframes teaser-callout-arrow {
+  0%, 100% { transform: translateY(0);    opacity: 1; }
+  50%      { transform: translateY(4px);  opacity: 0.6; }
+}
+/* Fade callout once the user has engaged with the scene */
+.teaser.is-playing .teaser-callout {
+  opacity: 0.35;
+  transform: scale(0.96);
+  animation: none;
+}
+.teaser.is-playing .teaser-callout .teaser-callout-arrow {
+  animation: none;
+}
+@media (max-width: 600px) {
+  .teaser-callout { font-size: 0.85rem; padding: 0.55rem 1rem; gap: 0.5rem; }
+}
+.teaser-caption {
+  max-width: 1000px;
+  margin: 1.25rem auto 0;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 1.0rem;
+  line-height: 1.7;
+  color: var(--color-text-main);
+}
+.teaser-caption strong { color: var(--color-text-heading); }
+
+.method-name {
+  font-weight: 700;
+  font-style: italic;
+  color: var(--color-accent-dark);
+  background: linear-gradient(135deg, rgba(90, 138, 184, 0.10), rgba(58, 108, 152, 0.18));
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  white-space: nowrap;
+  hyphens: manual;
+  -webkit-hyphens: manual;
+}
+
+/* ============================
+   Section base
+   ============================ */
+.section { padding: 4rem 1.5rem; }
+
+.section-title {
+  font-family: var(--font-serif);
+  font-weight: 800;
+  text-align: center;
+  margin: 0 auto 3rem;
+  font-size: 2.6rem;
+  letter-spacing: -0.01em;
+  color: var(--color-text-heading);
+  position: relative;
+  padding-bottom: 1.1rem;
+}
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 90px; height: 4px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-dark));
+  border-radius: 2px;
+}
+
+.subsection-title {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-white);
+  text-align: center;
+  margin: 4.5rem auto 2rem;
+  padding: 0.6rem 1.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  border-radius: 999px;
+  width: fit-content;
+  box-shadow: 0 4px 14px rgba(58, 108, 152, 0.22);
+  scroll-margin-top: 80px;
+}
+.section-title { scroll-margin-top: 80px; }
+.subsection-title::after { display: none; }
+.subsection-title:first-of-type { margin-top: 0; }
+
+/* ============================
+   Abstract
+   ============================ */
+.abstract-section { padding: 3.5rem 1.5rem; }
+.abstract-container {
+  background-color: var(--color-white);
+  border-radius: 12px;
+  padding: 2.5rem 3rem;
+  box-shadow: 0 4px 20px rgba(31, 45, 61, 0.06);
+  border: 1px solid var(--color-border);
+  max-width: 900px;
+  margin: 0 auto;
+}
+.abstract-container h2 {
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-bottom: 0.75rem;
+}
+.abstract-container h2::after {
+  content: '';
+  display: block;
+  width: 60px; height: 3px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-dark));
+  margin: 0.75rem auto 0;
+  border-radius: 2px;
+}
+.abstract-content {
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  line-height: 1.85;
+  color: var(--color-text-main);
+  text-align: justify;
+  hyphens: auto;
+}
+.abstract-content p { margin: 0 0 1.25rem; }
+.abstract-content p:last-child { margin-bottom: 0; }
+
+/* ============================
+   Column Headers (method labels)
+   ============================ */
+.column-headers {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--color-text-heading);
+  max-width: var(--content-max-width);
+  margin-left: auto;
+  margin-right: auto;
+  position: sticky;
+  top: 56px;
+  z-index: 50;
+  background-color: var(--color-bg-main);
+  padding: 0.5rem 0;
+  box-shadow: 0 6px 8px -6px rgba(31, 45, 61, 0.12);
+}
+.column-headers.is-section-break {
+  margin-top: 2.5rem;
+}
+/* Wrapper that scopes a sticky column-headers to its own rows.
+   When this wrapper's bottom scrolls past, the sticky header releases
+   instead of waiting for the next section's header to push it out. */
+.headers-scope {
+  display: flow-root;
+}
+.column-header {
+  padding: 0.6rem 0.4rem;
+  background-color: var(--color-accent);
+  color: var(--color-white);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: var(--font-sans);
+}
+.column-header.is-ours {
+  background-color: var(--color-accent-dark);
+}
+.column-header a {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.15s ease;
+}
+.column-header a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.92;
+}
+.column-header.is-input {
+  background-color: var(--color-text-heading);
+}
+.grid-item.is-input {
+  border: 1px solid var(--color-accent);
+  background-color: var(--color-white);
+}
+.grid-item.is-input img {
+  object-fit: contain;
+  background-color: var(--color-white);
+}
+.grid-item.is-ours {
+  border: 2px solid var(--color-accent-dark);
+}
+.grid-item.is-placeholder {
+  background-color: var(--color-bg-alt);
+  position: relative;
+}
+.grid-item.is-placeholder img {
+  object-fit: contain;
+  opacity: 0.35;
+  filter: grayscale(0.5);
+}
+.grid-item.is-placeholder::after {
+  content: 'N/A';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-heading);
+  background: rgba(255,255,255,0.85);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.grid-item.is-coming-soon::after { content: 'Coming Soon'; }
+
+/* ============================
+   Video grid rows
+   ============================ */
+.row-container {
+  margin: 0.5rem auto 0.75rem;
+  max-width: var(--content-max-width);
+}
+.row-container.has-prompt { margin-top: 1rem; }
+
+.row-prompt {
+  text-align: center;
+  font-family: var(--font-prompt);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--color-text-main);
+  margin: 0 auto 0.5rem;
+  padding: 0.4rem 1.5rem;
+  max-width: 900px;
+  line-height: 1.6;
+}
+.row-prompt::before { content: '\201C'; margin-right: 0.2em; }
+.row-prompt::after  { content: '\201D'; margin-left: 0.2em; }
+
+.row-label {
+  text-align: center;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-text-heading);
+  margin: 0 auto 0.4rem;
+}
+
+.results-grid {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-5 { grid-template-columns: repeat(5, 1fr); }
+.grid-6 { grid-template-columns: repeat(6, 1fr); }
+.grid-7 { grid-template-columns: repeat(7, 1fr); }
+.grid-8 { grid-template-columns: repeat(8, 1fr); }
+.grid-9 { grid-template-columns: repeat(9, 1fr); }
+.grid-10 { grid-template-columns: repeat(10, 1fr); }
+.grid-11 { grid-template-columns: repeat(11, 1fr); }
+.headers-2 { grid-template-columns: repeat(2, 1fr); }
+.headers-3 { grid-template-columns: repeat(3, 1fr); }
+.headers-4 { grid-template-columns: repeat(4, 1fr); }
+.headers-5 { grid-template-columns: repeat(5, 1fr); }
+.headers-6 { grid-template-columns: repeat(6, 1fr); }
+.headers-7 { grid-template-columns: repeat(7, 1fr); }
+.headers-8 { grid-template-columns: repeat(8, 1fr); }
+.headers-9 { grid-template-columns: repeat(9, 1fr); }
+.headers-10 { grid-template-columns: repeat(10, 1fr); }
+.headers-11 { grid-template-columns: repeat(11, 1fr); }
+
+.grid-item {
+  position: relative;
+  width: 100%;
+  background-color: var(--color-bg-alt);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.grid-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(31, 45, 61, 0.1);
+}
+.grid-item video,
+.grid-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+  background-color: #000;
+}
+
+.grid-item-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.65), transparent);
+  color: #fff;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  text-align: center;
+  font-weight: 500;
+  font-family: var(--font-sans);
+}
+
+.trajectory-label {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(6px) saturate(130%);
+  -webkit-backdrop-filter: blur(6px) saturate(130%);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-prompt);
+  font-style: italic;
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ============================
+   BibTeX
+   ============================ */
+#BibTeX { background-color: var(--color-bg-main); }
+#BibTeX pre {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  background-color: var(--color-white);
+  border-radius: 8px;
+  padding: 1.5rem;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  font-family: 'Menlo', 'Monaco', monospace;
+  color: var(--color-text-heading);
+}
+#BibTeX h2 {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* ============================
+   Footer
+   ============================ */
+.footer {
+  background-color: var(--color-bg-alt);
+  padding: 2.5rem 1.5rem;
+  color: var(--color-text-main);
+  font-size: 0.9rem;
+  text-align: center;
+  border-top: 1px solid var(--color-border);
+}
+.footer a { color: var(--color-accent-dark); font-weight: 600; }
+
+/* ============================
+   Responsive
+   ============================ */
+@media screen and (max-width: 1280px) {
+  .grid-10, .grid-11,
+  .headers-10, .headers-11 { grid-template-columns: repeat(5, 1fr); }
+  .grid-9, .headers-9 { grid-template-columns: repeat(5, 1fr); }
+  .grid-7, .grid-8, .headers-7, .headers-8 { grid-template-columns: repeat(4, 1fr); }
+}
+@media screen and (max-width: 900px) {
+  .publication-title { font-size: 1.9rem; }
+  .section-title { font-size: 1.6rem; }
+  .grid-3, .grid-4, .grid-5, .grid-6,
+  .grid-7, .grid-8, .grid-9, .grid-10, .grid-11,
+  .headers-3, .headers-4, .headers-5, .headers-6,
+  .headers-7, .headers-8, .headers-9, .headers-10, .headers-11 { grid-template-columns: repeat(3, 1fr); }
+  .nav-links { display: none; }
+}
+@media screen and (max-width: 600px) {
+  .grid-2, .grid-3, .grid-4, .grid-5, .grid-6,
+  .grid-7, .grid-8, .grid-9, .grid-10, .grid-11,
+  .headers-2, .headers-3, .headers-4, .headers-5, .headers-6,
+  .headers-7, .headers-8, .headers-9, .headers-10, .headers-11 { grid-template-columns: repeat(2, 1fr); }
+  .publication-banner .pdf-embed { height: 360px; }
+}
+
+/* ============================
+   Interactive showcase sections (above abstract)
+   ============================ */
+.section.interactive-section { padding: 4rem 1.5rem; }
+
+.section-heading-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+.section-heading-group .section-title { margin-bottom: 0; }
+
+.scope-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: rgba(255,255,255,0.6);
+  color: var(--color-accent-dark);
+}
+.scope-pill--full {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  color: #fff;
+  border-color: transparent;
+}
+.scope-pill--sde {
+  background: rgba(255,255,255,0.95);
+  color: var(--color-accent-dark);
+  border-color: var(--color-accent);
+}
+.scope-pill::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+/* --- Interactive Physics tabs + single-scene display --- */
+.physics-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.7rem;
+  max-width: 1200px;
+  margin: 0 auto 1.8rem;
+}
+.physics-tab {
+  flex: 0 1 220px;
+  padding: 0.75rem 1.4rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text-heading);
+  cursor: pointer;
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+}
+.physics-tab:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(58,108,152,0.10);
+}
+.physics-tab.is-active {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(58,108,152,0.25);
+}
+.physics-categories { max-width: 1400px; margin: 0 auto; }
+.physics-category { display: none; justify-content: center; }
+.physics-category.is-active { display: flex; }
+.interactive-card-title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  text-align: center;
+  margin: 0 0 0.85rem;
+  color: var(--color-text-heading);
+}
+.interactive-card-sub {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: var(--color-accent-dark);
+}
+.interactive-stage {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: #000;
+  height: min(64vh, 560px);
+}
+[data-demo="apple"]      .interactive-stage { aspect-ratio: 1536 / 1024; }
+[data-demo="snorlax"]    .interactive-stage { aspect-ratio: 824 / 1068; }
+[data-demo="sandcastle"] .interactive-stage { aspect-ratio: 984 / 1036; }
+.interactive-base,
+.interactive-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.interactive-video {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.interactive-video.is-active { opacity: 1; }
+.interactive-stage.is-playing .interactive-base { opacity: 0; transition: opacity 0.4s ease; }
+
+/* Apple direction arrows */
+.option-arrow,
+.option-pill {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #fff;
+  background: rgba(31, 45, 61, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  z-index: 4;
+  transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease, opacity 0.3s ease;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  animation: option-pulse 2.4s ease-in-out infinite;
+}
+.option-arrow:hover,
+.option-pill:hover {
+  background: var(--color-accent);
+  transform: translate(-50%, -50%) scale(1.06);
+  animation: none;
+}
+.option-arrow.is-active,
+.option-pill.is-active {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  border-color: rgba(255,255,255,0.9);
+  animation: none;
+  box-shadow: 0 0 0 4px rgba(90, 138, 184, 0.35), 0 6px 16px rgba(0,0,0,0.3);
+}
+.interactive-stage.has-selection .option-arrow:not(.is-active),
+.interactive-stage.has-selection .option-pill:not(.is-active) {
+  opacity: 0.42;
+  animation: none;
+}
+@keyframes option-pulse {
+  0%, 100% { box-shadow: 0 6px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(90, 138, 184, 0.55); }
+  50%      { box-shadow: 0 6px 16px rgba(0,0,0,0.25), 0 0 0 8px rgba(90, 138, 184, 0.0); }
+}
+
+/* Apple-specific positions (left/back/right around the apple) */
+.option-arrow {
+  transform: translate(-50%, -50%);
+}
+.option-arrow--left  { left: 11%; top: 38%; }
+.option-arrow--back  { left: 30%; top: 12%; }
+.option-arrow--right { left: 56%; top: 38%; }
+
+/* Snorlax-specific positions (material chips around the plush) */
+.option-pill { transform: translate(-50%, -50%); }
+.option-pill--m1 { left: 22%; top: 22%; }   /* Ice cream */
+.option-pill--m2 { left: 78%; top: 22%; }   /* Water */
+.option-pill--m3 { left: 50%; top: 88%; }   /* Jelly */
+
+/* Sand castle-specific positions (control-type chips around the castle) */
+.option-pill--f1 { left: 22%; top: 18%; }   /* Wind */
+.option-pill--f2 { left: 78%; top: 18%; }   /* 3D Force */
+
+.interactive-status {
+  margin-top: 0.85rem;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--color-text-main);
+}
+.interactive-status-label { font-weight: 500; }
+.interactive-status-value {
+  font-weight: 600;
+  color: var(--color-accent-dark);
+  margin-left: 0.4rem;
+}
+
+/* --- SDE Generalizes section: category tabs + comparison sliders --- */
+.sde-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.7rem;
+  max-width: 1200px;
+  margin: 0 auto 1.5rem;
+}
+.sde-tab {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+}
+.sde-tab:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(58,108,152,0.10);
+}
+.sde-tab.is-active {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(58,108,152,0.25);
+}
+.sde-tab-name {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text-heading);
+  line-height: 1.2;
+}
+.sde-tab.is-active .sde-tab-name { color: #fff; }
+.sde-tab-type {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  line-height: 1.3;
+}
+.sde-tab.is-active .sde-tab-type { color: rgba(255,255,255,0.9); }
+
+.sde-description {
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  color: var(--color-text-main);
+  max-width: 760px;
+  margin: 0 auto 1.6rem;
+  opacity: 0.78;
+}
+.compare-caption {
+  text-align: center;
+  font-family: var(--font-prompt);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--color-text-main);
+  line-height: 1.45;
+  margin: 0;
+  padding: 0 0.5rem;
+}
+.compare-caption strong {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  color: var(--color-text-heading);
+  margin-right: 0.35em;
+}
+.compare-caption-arrow {
+  display: inline-block;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
+  margin: 0.15rem 0;
+  opacity: 0.7;
+}
+.compare-caption-hl {
+  font-style: normal;
+  font-weight: 600;
+  padding: 0.02em 0.22em;
+  border-radius: 3px;
+}
+.compare-caption-hl--cradle {
+  color: #2c7a5a;
+  background: rgba(44, 122, 90, 0.14);
+}
+.compare-caption-hl--lava {
+  color: #c14a2a;
+  background: rgba(193, 74, 42, 0.14);
+}
+
+.sde-categories { max-width: 1500px; margin: 0 auto; }
+.sde-category { display: none; }
+.sde-category.is-active { display: block; }
+
+.sde-scene-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* --- Compare slider (input vs result, drag to reveal) --- */
+.compare-slider {
+  --pos: 50%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background-color: #000;
+  border: 1px solid var(--color-border);
+  aspect-ratio: 16 / 9;
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.compare-slider video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+.compare-slider.compare-slider--contain video {
+  object-fit: contain;
+}
+.compare-slider .compare-top {
+  clip-path: inset(0 0 0 var(--pos));
+  -webkit-clip-path: inset(0 0 0 var(--pos));
+}
+
+.compare-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: var(--pos);
+  width: 2px;
+  background: rgba(255,255,255,0.95);
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+.compare-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 36px; height: 36px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.95);
+  border: 2px solid var(--color-accent-dark);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+.compare-handle::after {
+  content: '\f337'; /* fa arrows-left-right */
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 0.9rem;
+  color: var(--color-accent-dark);
+}
+
+/* Slider-attached labels: track the divider, sit just above the handle.
+   Left label sits to the left of the handle line; right label to the right. */
+.compare-label {
+  position: absolute;
+  top: 0.7rem;
+  left: var(--pos);
+  z-index: 4;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.compare-label--left {
+  transform: translateX(calc(-100% - 0.5rem));
+  background: rgba(31, 45, 61, 0.78);
+  border: 1px solid rgba(255,255,255,0.22);
+}
+.compare-label--right {
+  transform: translateX(0.5rem);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: 0 2px 8px rgba(58,108,152,0.25);
+}
+.compare-label-sub {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.92;
+  margin-top: 0.1rem;
+}
+
+/* Multi-scene compare slider: only the active scene's videos render */
+.compare-slider--multi video { display: none; }
+.compare-slider--multi[data-active-scene="1"] video[data-scene="1"],
+.compare-slider--multi[data-active-scene="2"] video[data-scene="2"],
+.compare-slider--multi[data-active-scene="3"] video[data-scene="3"] {
+  display: block;
+}
+.scene-tabs {
+  position: absolute;
+  bottom: 0.7rem;
+  right: 0.7rem;
+  z-index: 4;
+  display: flex;
+  gap: 0.3rem;
+  background: rgba(31, 45, 61, 0.55);
+  padding: 0.2rem;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.18);
+}
+.scene-tab {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,0.85);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+.scene-tab:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.scene-tab.is-active {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+
+@media screen and (max-width: 900px) {
+  .sde-scene-row { grid-template-columns: 1fr; }
+  .sde-tab { min-width: 140px; }
+  .physics-tab { flex: 1 1 auto; font-size: 0.95rem; padding: 0.6rem 1rem; }
+  .interactive-stage { height: min(52vh, 460px); }
+}
+@media screen and (max-width: 600px) {
+  .option-arrow, .option-pill { font-size: 0.72rem; padding: 0.35rem 0.6rem; }
+}
+</style>
 </head>
+
 <body>
-  <h1>3DPhysVideo</h1>
-  <p>Project page coming soon.</p>
+
+<!-- Navigation -->
+<nav class="header-nav" id="header-nav">
+  <div class="nav-title">3DPhysVideo</div>
+  <div class="nav-links">
+    <a href="#teaser">Teaser</a>
+    <a href="#abstract">Abstract</a>
+    <a href="#interactive-physics">Physics Control</a>
+    <a href="#interactive-sde">SDE</a>
+    <div class="nav-dropdown">
+      <a href="#comparisons" class="nav-dropdown-trigger">Comparison <span class="nav-dropdown-caret">▾</span></a>
+      <div class="nav-dropdown-menu">
+        <a href="#full-pipeline">Full Pipeline</a>
+        <a href="#stage1">Stage 1</a>
+        <a href="#stage2">Stage 2</a>
+      </div>
+    </div>
+    <a href="#BibTeX">BibTeX</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero publication-header">
+  <h1 class="publication-title">
+    <span class="title-brand">3DPhysVideo</span>: Consistency-Guided Flow SDE for Video Generation via 3D Scene Reconstruction and Physical Simulation
+  </h1>
+  <div class="publication-authors">
+    <span class="author-block"><a href="https://hwidong-kim.github.io/" target="_blank" rel="noopener">Hwidong Kim</a><sup class="eql">*</sup></span>
+    <span class="author-block"><a href="https://yunho0421.vercel.app/about" target="_blank" rel="noopener">Yunho Kim</a><sup class="eql">*</sup></span>
+    <span class="author-block"><a href="https://sites.google.com/view/tkkim/home" target="_blank" rel="noopener">Tae-Kyun Kim</a></span>
+  </div>
+  <div class="publication-affiliation">KAIST</div>
+  <div class="publication-affiliation" style="font-size:0.9rem;color:var(--color-text-main);">
+    <sup class="eql">*</sup>Equal contribution.
+  </div>
+
+  <div class="publication-links">
+    <span class="link-block">
+      <a class="button" href="#" target="_blank" rel="noopener">
+        <span class="icon"><i class="fas fa-file-pdf"></i></span>
+        <span>Paper</span>
+      </a>
+    </span>
+    <span class="link-block">
+      <a class="button" href="#" target="_blank" rel="noopener">
+        <span class="icon"><i class="ai ai-arxiv"></i></span>
+        <span>arXiv</span>
+      </a>
+    </span>
+    <span class="link-block">
+      <a class="button" href="https://github.com/hwidong-kim/3DPhysVideo" target="_blank" rel="noopener">
+        <span class="icon"><i class="fab fa-github"></i></span>
+        <span>Code</span>
+      </a>
+    </span>
+  </div>
+</section>
+
+<!-- Teaser -->
+<section class="hero teaser" id="teaser">
+  <div class="container">
+
+    <!-- Big, friendly invitation so first-time visitors don't miss the
+         interaction. Fades back once they've engaged. -->
+    <div class="teaser-callout">
+      <i class="fas fa-arrow-pointer teaser-callout-icon" aria-hidden="true"></i>
+      <span class="teaser-callout-text">Move your cursor across the scene below to breathe life into each part with 3D physics</span>
+      <span class="teaser-callout-arrow" aria-hidden="true">↓</span>
+    </div>
+
+    <div class="teaser-spotlight" id="teaser-spotlight">
+      <img class="teaser-base" src="assets/teaser.png" alt="3DPhysVideo teaser scene">
+
+      <!-- Each video is placed at its exact bbox in the static image
+           (computed by ORB feature matching between teaser4.png and each
+           video's first frame). Video aspect matches its bbox aspect, so
+           object-fit:cover gives pixel-accurate alignment with the base image.
+           Hidden by default; fades in when its hotspot is hovered. -->
+      <video class="teaser-region" data-region="cloth"  src="assets/videos/teaser_spotlight/cloth.mp4"
+             style="left:-0.08%; top:0.01%;  width:46.18%; height:47.29%"
+             muted loop playsinline preload="auto"></video>
+      <video class="teaser-region" data-region="duck"   src="assets/videos/teaser_spotlight/duck.mp4"
+             style="left: 7.12%; top:40.65%; width:40.97%; height:41.99%"
+             muted loop playsinline preload="auto"></video>
+      <video class="teaser-region" data-region="steam"  src="assets/videos/teaser_spotlight/steam.mp4"
+             style="left:29.65%; top: 2.83%; width:48.23%; height:49.44%"
+             muted loop playsinline preload="auto"></video>
+      <video class="teaser-region" data-region="bubble" src="assets/videos/teaser_spotlight/bubble.mp4"
+             style="left:54.31%; top:23.55%; width:45.14%; height:46.27%"
+             muted loop playsinline preload="auto"></video>
+
+      <!-- Visible pulsing markers — placed at the visual center of each
+           element in the static teaser image (robe / duck / steam / bubbles) -->
+      <div class="teaser-marker" data-region="cloth"  style="left:13.5%;  top:25%"></div>
+      <div class="teaser-marker" data-region="duck"   style="left:29.5%; top:63.3%"></div>
+      <div class="teaser-marker" data-region="steam"  style="left:54%; top:32.5%"></div>
+      <div class="teaser-marker" data-region="bubble" style="left:75%; top:52.3%"></div>
+
+    </div>
+
+    <p class="teaser-caption">
+      We propose <span class="method-name">3DPhysVideo</span>, a training-free framework for 3D physics-conditioned video generation, leveraging an off-the-shelf video model.
+      From a single input scene, our method enables users to apply diverse physical controls to a variety of materials.
+    </p>
+  </div>
+</section>
+
+<!-- Abstract -->
+<section class="section abstract-section" id="abstract">
+  <div class="abstract-container">
+    <h2>Abstract</h2>
+    <div class="abstract-content">
+      <p>
+        Video generative models have made remarkable progress, yet they often yield visual artifacts that violate grounding in physical dynamics. Recent works such as PhysGen3D tackle single image-to-3D physics through mesh reconstruction and Physically-Based Rendering, but challenges remain in modeling fluid dynamics, multi-object interactions and photorealism. This work introduces <span class="method-name">3DPhysVideo</span>, a novel training-free pipeline that generates physically realistic videos from a single image. We repurpose an off-the-shelf video model for two stages. First, we use it as a novel view synthesizer to reconstruct complete 360-degree 3D scene geometry by guiding the image-to-video (I2V) flow model with rendered point clouds. Second, after applying physics solvers to this geometry, the physically simulated point cloud is used to guide the same I2V flow model to synthesize final, high-quality videos. <span class="method-name">Consistency-Guided Flow SDE</span>, which decomposes the predicted velocity of the I2V flow model into denoising and consistency bias, enforces consistency to the conditional inputs, allowing us to effectively repurpose the model for both 3D reconstruction and simulation-guided video generation. In diverse experiments including multi-object and fluid interaction scenes, our method successfully bridges the gap from single images to physically plausible videos, while remaining efficient to run on a single consumer GPU. It outperforms baselines on GPT-based scores, the VideoPhy benchmark and human evaluation.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     Interactive 3D-Physics Control (Full pipeline showcase)
+     ============================================================ -->
+<section class="section interactive-section physics-interactive-section" id="interactive-physics">
+  <div class="container is-fluid">
+    <h2 class="section-title">Interactive 3D-Physics Control</h2>
+
+    <div class="physics-tabs" id="physics-tabs">
+      <button class="physics-tab is-active" data-demo="snorlax">Material</button>
+      <button class="physics-tab" data-demo="sandcastle">Control type</button>
+      <button class="physics-tab" data-demo="apple">Initial velocity</button>
+    </div>
+
+    <div class="physics-categories" id="physics-categories">
+
+      <!-- Snorlax material -->
+      <div class="physics-category is-active" data-demo="snorlax">
+        <div class="interactive-stage" data-stage>
+          <img class="interactive-base" src="assets/videos/physics_control/snorlax/input.png" alt="Snorlax input image">
+          <video class="interactive-video" data-option="icecream" src="assets/videos/physics_control/snorlax/icecream.mp4" muted loop playsinline preload="auto"></video>
+          <video class="interactive-video" data-option="water"    src="assets/videos/physics_control/snorlax/water.mp4"    muted loop playsinline preload="auto"></video>
+          <video class="interactive-video" data-option="jelly"    src="assets/videos/physics_control/snorlax/jelly.mp4"    muted loop playsinline preload="auto"></video>
+
+          <button class="option-pill option-pill--m1" data-option="icecream" data-label="Ice cream">
+            <i class="fas fa-ice-cream" aria-hidden="true"></i> Ice cream
+          </button>
+          <button class="option-pill option-pill--m2" data-option="water" data-label="Water">
+            <i class="fas fa-droplet" aria-hidden="true"></i> Water
+          </button>
+          <button class="option-pill option-pill--m3" data-option="jelly" data-label="Jelly">
+            <i class="fas fa-cube" aria-hidden="true"></i> Jelly
+          </button>
+        </div>
+      </div>
+
+      <!-- Sand castle control type -->
+      <div class="physics-category" data-demo="sandcastle">
+        <div class="interactive-stage" data-stage>
+          <img class="interactive-base" src="assets/videos/physics_control/sandcastle/input.png" alt="Sand castle input image">
+          <video class="interactive-video" data-option="wind"  src="assets/videos/physics_control/sandcastle/wind.mp4"     muted loop playsinline preload="auto"></video>
+          <video class="interactive-video" data-option="force" src="assets/videos/physics_control/sandcastle/force.mp4" muted loop playsinline preload="auto"></video>
+
+          <button class="option-pill option-pill--f1" data-option="wind" data-label="Wind">
+            <i class="fas fa-wind" aria-hidden="true"></i> Wind
+          </button>
+          <button class="option-pill option-pill--f2" data-option="force" data-label="3D Force">
+            <i class="fas fa-arrow-down" aria-hidden="true"></i> 3D Force
+          </button>
+        </div>
+      </div>
+
+      <!-- Apple velocity -->
+      <div class="physics-category" data-demo="apple">
+        <div class="interactive-stage" data-stage>
+          <img class="interactive-base" src="assets/videos/physics_control/apple/input.png" alt="Apple input image">
+          <video class="interactive-video" data-option="left"  src="assets/videos/physics_control/apple/left.mp4"  muted loop playsinline preload="auto"></video>
+          <video class="interactive-video" data-option="back"  src="assets/videos/physics_control/apple/back.mp4"  muted loop playsinline preload="auto"></video>
+          <video class="interactive-video" data-option="right" src="assets/videos/physics_control/apple/right.mp4" muted loop playsinline preload="auto"></video>
+
+          <button class="option-arrow option-arrow--left"  data-option="left"  data-label="Left"  aria-label="Apply leftward initial velocity">
+            <i class="fas fa-arrow-left" aria-hidden="true"></i><span>Left</span>
+          </button>
+          <button class="option-arrow option-arrow--back"  data-option="back"  data-label="Back"  aria-label="Apply backward initial velocity">
+            <i class="fas fa-arrow-up" aria-hidden="true"></i><span>Back</span>
+          </button>
+          <button class="option-arrow option-arrow--right" data-option="right" data-label="Right" aria-label="Apply rightward initial velocity">
+            <span>Right</span><i class="fas fa-arrow-right" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     Beyond Physics: Our SDE Generalizes (SDE-only showcase)
+     ============================================================ -->
+<section class="section interactive-section sde-interactive-section" id="interactive-sde">
+  <div class="container is-fluid">
+    <h2 class="section-title">Our SDE Across Tasks</h2>
+
+    <div class="sde-tabs" id="sde-tabs">
+      <button class="sde-tab is-active" data-cat="fine">
+        <span class="sde-tab-name">Fine-grained Motion</span>
+      </button>
+      <button class="sde-tab" data-cat="coarse">
+        <span class="sde-tab-name">Coarse Motion</span>
+      </button>
+      <button class="sde-tab" data-cat="camera">
+        <span class="sde-tab-name">Camera Trajectory</span>
+      </button>
+      <button class="sde-tab" data-cat="text">
+        <span class="sde-tab-name">Text Alignment</span>
+      </button>
+    </div>
+
+    <div class="sde-categories">
+
+      <!-- Fine-grained motion: simulation → ours -->
+      <div class="sde-category is-active" data-cat="fine">
+        <div class="sde-scene-row">
+          <div class="compare-slider">
+            <video class="compare-bottom" src="assets/videos/sde/physics_sim/sim.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    src="assets/videos/sde/physics_sim/ours.mp4" muted loop playsinline preload="auto"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Physics simulation</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+          </div>
+          <div class="compare-slider compare-slider--contain">
+            <video class="compare-bottom" src="assets/videos/comparison/stage2/book/simulation.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    src="assets/videos/comparison/stage2/book/ours.mp4" muted loop playsinline preload="auto"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Physics simulation</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coarse motion: driving → ours -->
+      <div class="sde-category" data-cat="coarse">
+        <div class="sde-scene-row">
+          <div class="compare-slider">
+            <video class="compare-bottom" src="assets/videos/sde/motion_bbox/bbox.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    src="assets/videos/sde/motion_bbox/ours.mp4" muted loop playsinline preload="auto"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Bounding-box trajectory</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+          </div>
+
+          <!-- Multi-scene slider (3 scenes, default scene 1) -->
+          <div class="compare-slider compare-slider--multi" data-active-scene="1">
+            <video class="compare-bottom" data-scene="1" src="assets/videos/sde/motion_cutdrag/scene1_drag.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    data-scene="1" src="assets/videos/sde/motion_cutdrag/scene1_ours.mp4"        muted loop playsinline preload="auto"></video>
+            <video class="compare-bottom" data-scene="2" src="assets/videos/sde/motion_cutdrag/scene2_drag.mp4" muted loop playsinline preload="none"></video>
+            <video class="compare-top"    data-scene="2" src="assets/videos/sde/motion_cutdrag/scene2_ours.mp4"        muted loop playsinline preload="none"></video>
+            <video class="compare-bottom" data-scene="3" src="assets/videos/sde/motion_cutdrag/scene3_drag.mp4" muted loop playsinline preload="none"></video>
+            <video class="compare-top"    data-scene="3" src="assets/videos/sde/motion_cutdrag/scene3_ours.mp4"        muted loop playsinline preload="none"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Cut-and-drag</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+            <div class="scene-tabs">
+              <button class="scene-tab is-active" data-scene="1">Scene 1</button>
+              <button class="scene-tab" data-scene="2">Scene 2</button>
+              <button class="scene-tab" data-scene="3">Scene 3</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera trajectory: trajectory video → ours -->
+      <div class="sde-category" data-cat="camera">
+        <div class="sde-scene-row">
+          <div class="compare-slider compare-slider--contain">
+            <video class="compare-bottom" src="assets/videos/comparison/stage1_static/scene1/camera_traj.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    src="assets/videos/comparison/stage1_static/scene1/ours.mp4" muted loop playsinline preload="auto"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Static scene (full 360°)</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+          </div>
+          <div class="compare-slider">
+            <video class="compare-bottom" src="assets/videos/comparison/stage1_dynamic/zoom_out/camera_traj.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    src="assets/videos/comparison/stage1_dynamic/zoom_out/ours.mp4" muted loop playsinline preload="auto"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Dynamic scene (zoom out)</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Text alignment: input video → ours -->
+      <div class="sde-category" data-cat="text">
+        <div class="sde-scene-row">
+          <p class="compare-caption">&ldquo;A set of <span class="compare-caption-hl compare-caption-hl--cradle">five metal spheres</span> hangs in a line. Two spheres on the left swing down in a <span class="compare-caption-hl compare-caption-hl--cradle">smooth, slow</span> arc &hellip; the two spheres on the far right rise upward, <span class="compare-caption-hl compare-caption-hl--cradle">maintaining the exact five-sphere</span> arrangement, all unfolding in a slow, deliberate motion.&rdquo;</p>
+          <p class="compare-caption">&ldquo;A Snorlax <span class="compare-caption-hl compare-caption-hl--lava">melting into molten lava</span>, surrounded by <span class="compare-caption-hl compare-caption-hl--lava">flames and glowing embers</span>, as <span class="compare-caption-hl compare-caption-hl--lava">fiery lava bursts and flows</span> around it.&rdquo;</p>
+          <div class="compare-slider">
+            <video class="compare-bottom" src="assets/videos/sde/text_align/cradle_naive.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    src="assets/videos/sde/text_align/cradle_ours.mp4" muted loop playsinline preload="auto"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Naive inference</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+          </div>
+          <div class="compare-slider compare-slider--contain">
+            <video class="compare-bottom" src="assets/videos/sde/text_align/lava_initial.mp4" muted loop playsinline preload="auto"></video>
+            <video class="compare-top"    src="assets/videos/sde/text_align/lava_ours.mp4" muted loop playsinline preload="auto"></video>
+            <div class="compare-handle" aria-hidden="true"></div>
+            <div class="compare-label compare-label--left">Initial video</div>
+            <div class="compare-label compare-label--right">+ Our SDE</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     Section 02: Main Qualitative Comparison
+     10 columns: Input + 8 baselines + Ours
+     ============================================================ -->
+<section class="section comparison-section" id="comparisons">
+  <div class="container is-fluid">
+    <h2 class="section-title">Comparison with Baselines</h2>
+
+    <h3 class="subsection-title" id="full-pipeline">Full Pipeline: Single Image to Video Generation</h3>
+
+    <div class="headers-scope">
+    <div class="column-headers headers-10">
+      <div class="column-header is-input">Image</div>
+      <div class="column-header"><a href="https://openai.com/ko-KR/index/sora/" target="_blank" rel="noopener">Sora</a></div>
+      <div class="column-header"><a href="https://runwayml.com/research/introducing-gen-3-alpha" target="_blank" rel="noopener">Gen3</a></div>
+      <div class="column-header"><a href="https://aistudio.google.com/models/veo-3" target="_blank" rel="noopener">Veo3</a></div>
+      <div class="column-header"><a href="https://framepack.net/" target="_blank" rel="noopener">FramePack</a></div>
+      <div class="column-header"><a href="https://by-luckk.github.io/PhysGen3D/" target="_blank" rel="noopener">PhysGen3D</a></div>
+      <div class="column-header"><a href="https://madaoer.github.io/projects/physically_plausible_video_generation/" target="_blank" rel="noopener">VLIPP</a></div>
+      <div class="column-header"><a href="https://cwchenwang.github.io/physctrl/" target="_blank" rel="noopener">PhysCtrl</a></div>
+      <div class="column-header"><a href="https://vcai.mpi-inf.mpg.de/projects/PSIVG/" target="_blank" rel="noopener">PSIVG</a></div>
+      <div class="column-header is-ours">Ours</div>
+    </div>
+
+    <!-- Domino (non-local: multi-object collision via Physics-IQ composition) -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The blue ball strikes the dominos.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/domino/input.png" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/domino/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/domino/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/domino/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/domino/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-placeholder"><img src="assets/videos/comparison/full_pipeline/domino/input.png" alt="PhysGen3D (no result)"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/domino/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/domino/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/domino/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/domino/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Macarons -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The macarons and jellies fall to the table.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/macarons/input.jpg" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/macarons/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/macarons/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Sandcastle -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The sand castle collapses.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/sandcastle/input.jpg" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/sandcastle/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/sandcastle/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Book -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The book falls forward.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/book/input.jpg" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/book/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/book/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Apple -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">Apple drops to the right.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/apple/input.png" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/apple/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/apple/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Blue ball -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The blue ball drops to the green playdough.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/blueball/input.jpg" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/blueball/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/blueball/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Brick -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The yellow brick falls right.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/brick/input.jpg" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/brick/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/brick/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Ball collide -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The ball on the left moves right, hits the ball on the right.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/ballcollide/input.jpg" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/ballcollide/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/ballcollide/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <!-- Snorlax -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The snorlax plush toy deflates.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/snorlax/input.png" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/snorlax/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/snorlax/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    </div>
+
+    <!-- Can teddy -->
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The red can moves right, hits the teddy on the right.</div>
+      <div class="results-grid grid-10">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/full_pipeline/canteddy/input.jpg" alt="Input"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/sora.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/gen3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/veo3.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/framepack.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/physgen3d.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/vlipp.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/physctrl.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/full_pipeline/canteddy/psivg.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/full_pipeline/canteddy/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <h3 class="subsection-title" id="stage1">Stage 1: Camera-controlled Video Generation</h3>
+
+    <div class="headers-scope">
+    <div class="column-headers headers-7">
+      <div class="column-header is-input">Static Scene</div>
+      <div class="column-header is-input">Camera Trajectory</div>
+      <div class="column-header"><a href="https://xizaoqu.github.io/trajattn/" target="_blank" rel="noopener">TrajectoryAttention</a></div>
+      <div class="column-header"><a href="https://igl-hkust.github.io/das/" target="_blank" rel="noopener">Diffusion as Shader</a></div>
+      <div class="column-header"><a href="https://eyeline-labs.github.io/Go-with-the-Flow/" target="_blank" rel="noopener">Go-with-the-Flow</a></div>
+      <div class="column-header"><a href="https://jianhongbai.github.io/ReCamMaster/" target="_blank" rel="noopener">ReCamMaster</a></div>
+      <div class="column-header is-ours">Ours</div>
+    </div>
+
+    <div class="row-container">
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage1_static/scene1/input.jpg" alt="Static scene"></div>
+        <div class="grid-item">
+          <video src="assets/videos/comparison/stage1_static/scene1/camera_traj.mp4" autoplay loop muted playsinline loading="lazy"></video>
+          <div class="trajectory-label">Full 360°</div>
+        </div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene1/trajattn.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene1/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene1/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene1/recammaster.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage1_static/scene1/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <div class="row-container">
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage1_static/scene2/input.jpg" alt="Static scene"></div>
+        <div class="grid-item">
+          <video src="assets/videos/comparison/stage1_static/scene2/camera_traj.mp4" autoplay loop muted playsinline loading="lazy"></video>
+          <div class="trajectory-label">Full 360°</div>
+        </div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene2/trajattn.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene2/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene2/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene2/recammaster.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage1_static/scene2/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <div class="row-container">
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage1_static/scene3/input.jpg" alt="Static scene"></div>
+        <div class="grid-item">
+          <video src="assets/videos/comparison/stage1_static/scene3/camera_traj.mp4" autoplay loop muted playsinline loading="lazy"></video>
+          <div class="trajectory-label">Full 360°</div>
+        </div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene3/trajattn.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene3/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene3/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene3/recammaster.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage1_static/scene3/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+    </div>
+
+    <div class="row-container">
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage1_static/scene4/input.jpg" alt="Static scene"></div>
+        <div class="grid-item">
+          <video src="assets/videos/comparison/stage1_static/scene4/camera_traj.mp4" autoplay loop muted playsinline loading="lazy"></video>
+          <div class="trajectory-label">Full 360°</div>
+        </div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene4/trajattn.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene4/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene4/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_static/scene4/recammaster.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage1_static/scene4/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <div class="headers-scope">
+    <div class="column-headers headers-7 is-section-break">
+      <div class="column-header is-input">Dynamic Scene</div>
+      <div class="column-header is-input">Camera Trajectory</div>
+      <div class="column-header"><a href="https://xizaoqu.github.io/trajattn/" target="_blank" rel="noopener">TrajectoryAttention</a></div>
+      <div class="column-header"><a href="https://igl-hkust.github.io/das/" target="_blank" rel="noopener">Diffusion as Shader</a></div>
+      <div class="column-header"><a href="https://eyeline-labs.github.io/Go-with-the-Flow/" target="_blank" rel="noopener">Go-with-the-Flow</a></div>
+      <div class="column-header"><a href="https://jianhongbai.github.io/ReCamMaster/" target="_blank" rel="noopener">ReCamMaster</a></div>
+      <div class="column-header is-ours">Ours</div>
+    </div>
+
+    <div class="row-container">
+      <div class="results-grid grid-7">
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/zoom_out/dynamic_scene.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item">
+          <video src="assets/videos/comparison/stage1_dynamic/zoom_out/camera_traj.mp4" autoplay loop muted playsinline loading="lazy"></video>
+          <div class="trajectory-label">Zoom Out</div>
+        </div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/zoom_out/trajattn.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/zoom_out/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/zoom_out/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/zoom_out/recammaster.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage1_dynamic/zoom_out/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <div class="row-container">
+      <div class="results-grid grid-7">
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_down/dynamic_scene.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item">
+          <video src="assets/videos/comparison/stage1_dynamic/translate_down/camera_traj.mp4" autoplay loop muted playsinline loading="lazy"></video>
+          <div class="trajectory-label">Translate Down</div>
+        </div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_down/trajattn.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_down/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_down/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_down/recammaster.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage1_dynamic/translate_down/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+    </div>
+
+    <div class="row-container">
+      <div class="results-grid grid-7">
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_up/dynamic_scene.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item">
+          <video src="assets/videos/comparison/stage1_dynamic/translate_up/camera_traj.mp4" autoplay loop muted playsinline loading="lazy"></video>
+          <div class="trajectory-label">Translate Up</div>
+        </div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_up/trajattn.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_up/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_up/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage1_dynamic/translate_up/recammaster.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage1_dynamic/translate_up/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <h3 class="subsection-title" id="stage2">Stage 2: Motion-conditioned Video Generation</h3>
+
+    <div class="headers-scope">
+    <div class="column-headers headers-7">
+      <div class="column-header is-input">Image</div>
+      <div class="column-header is-input">Simulation Result</div>
+      <div class="column-header"><a href="https://bujiazi.github.io/motionclone.github.io/" target="_blank" rel="noopener">MotionClone</a></div>
+      <div class="column-header"><a href="https://igl-hkust.github.io/das/" target="_blank" rel="noopener">Diffusion as Shader</a></div>
+      <div class="column-header"><a href="https://eyeline-labs.github.io/Go-with-the-Flow/" target="_blank" rel="noopener">Go-with-the-Flow</a></div>
+      <div class="column-header"><a href="https://quanhaol.github.io/magicmotion-site/" target="_blank" rel="noopener">MagicMotion</a></div>
+      <div class="column-header is-ours">Ours</div>
+    </div>
+
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The yellow brick falls right.</div>
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage2/brick/input.jpg" alt="Input image"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/brick/simulation.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/brick/motionclone.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/brick/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/brick/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/brick/magicmotion.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage2/brick/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The book falls forward.</div>
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage2/book/input.jpg" alt="Input image"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/book/simulation.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/book/motionclone.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/book/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/book/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/book/magicmotion.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage2/book/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The red can moves right, hits the teddy on the right.</div>
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage2/canteddy/input.jpg" alt="Input image"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/canteddy/simulation.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/canteddy/motionclone.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/canteddy/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/canteddy/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/canteddy/magicmotion.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage2/canteddy/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+    </div>
+
+    <div class="row-container has-prompt">
+      <div class="row-prompt">The snorlax plush toy deflates.</div>
+      <div class="results-grid grid-7">
+        <div class="grid-item is-input"><img src="assets/videos/comparison/stage2/snorlax/input.png" alt="Input image"></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/snorlax/simulation.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/snorlax/motionclone.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/snorlax/das.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/snorlax/gowiththeflow.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item"><video src="assets/videos/comparison/stage2/snorlax/magicmotion.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+        <div class="grid-item is-ours"><video src="assets/videos/comparison/stage2/snorlax/ours.mp4" autoplay loop muted playsinline loading="lazy"></video></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- BibTeX -->
+<section class="section" id="BibTeX">
+  <div class="container">
+    <h2>BibTeX</h2>
+    <pre><code>@article{kim20263dphysvideo,
+  title   = {3DPhysVideo: Consistency-Guided Flow SDE for Video Generation
+             via 3D Scene Reconstruction and Physical Simulation},
+  author  = {Kim, Hwidong and Kim, Yunho and Kim, Tae-Kyun},
+  journal = {arXiv preprint},
+  year    = {2026},
+}</code></pre>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="container">
+    <p>
+      This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank" rel="noopener">Academic Project Page Template</a>.
+      This website is licensed under a <a href="http://creativecommons.org/licenses/by-sa/4.0/" rel="license" target="_blank">Creative Commons Attribution-ShareAlike 4.0 International License</a>.
+    </p>
+  </div>
+</footer>
+
+<script>
+  // Sticky nav background on scroll
+  (function() {
+    var nav = document.getElementById('header-nav');
+    var onScroll = function() {
+      if (window.scrollY > 30) nav.classList.add('is-scrolled');
+      else nav.classList.remove('is-scrolled');
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  })();
+
+  // Teaser: hover anywhere inside a video's bbox → that video plays.
+  // For overlapping bboxes, pick the one whose center is closest (in px) to
+  // the cursor.
+  (function() {
+    var sp = document.getElementById('teaser-spotlight');
+    if (!sp) return;
+    var videos = sp.querySelectorAll('.teaser-region');
+    var currentRegion = null;
+
+    function findRegion(xPx, yPx, rect) {
+      var best = null;
+      var bestDist2 = Infinity;
+      videos.forEach(function(v) {
+        var xPct = parseFloat(v.style.left);
+        var yPct = parseFloat(v.style.top);
+        var wPct = parseFloat(v.style.width);
+        var hPct = parseFloat(v.style.height);
+        var x = xPct / 100 * rect.width;
+        var y = yPct / 100 * rect.height;
+        var w = wPct / 100 * rect.width;
+        var h = hPct / 100 * rect.height;
+        if (xPx >= x && xPx <= x + w && yPx >= y && yPx <= y + h) {
+          var dx = xPx - (x + w / 2);
+          var dy = yPx - (y + h / 2);
+          var d2 = dx * dx + dy * dy;
+          if (d2 < bestDist2) {
+            bestDist2 = d2;
+            best = v.dataset.region;
+          }
+        }
+      });
+      return best;
+    }
+
+    function setRegion(region) {
+      if (region === currentRegion) return;
+      currentRegion = region;
+      var teaserSection = sp.closest('.teaser');
+      if (region) {
+        sp.classList.add('is-playing');
+        if (teaserSection) teaserSection.classList.add('is-playing');
+      } else {
+        sp.classList.remove('is-playing');
+        if (teaserSection) teaserSection.classList.remove('is-playing');
+      }
+      videos.forEach(function(v) {
+        if (v.dataset.region === region) {
+          v.classList.add('is-active');
+          try { v.currentTime = 0; } catch (err) {}
+          var p = v.play();
+          if (p && p.catch) p.catch(function(){});
+        } else {
+          v.classList.remove('is-active');
+          v.pause();
+          try { v.currentTime = 0; } catch (err) {}
+        }
+      });
+    }
+
+    sp.addEventListener('mousemove', function(e) {
+      var rect = sp.getBoundingClientRect();
+      var xPx = e.clientX - rect.left;
+      var yPx = e.clientY - rect.top;
+      setRegion(findRegion(xPx, yPx, rect));
+    }, { passive: true });
+    sp.addEventListener('mouseleave', function() { setRegion(null); });
+  })();
+
+  // Interactive physics: tab switcher + option-click swaps input for matching video.
+  (function() {
+    function resetStage(stage) {
+      if (!stage) return;
+      stage.classList.remove('is-playing', 'has-selection');
+      stage.querySelectorAll('.interactive-video').forEach(function(v) {
+        v.classList.remove('is-active');
+        v.pause();
+      });
+      stage.querySelectorAll('[data-option]').forEach(function(o) { o.classList.remove('is-active'); });
+    }
+
+    // Per-category option clicks
+    document.querySelectorAll('.physics-category').forEach(function(cat) {
+      var stage = cat.querySelector('[data-stage]');
+      if (!stage) return;
+      var videos = stage.querySelectorAll('.interactive-video');
+      var options = stage.querySelectorAll('[data-option]');
+      options.forEach(function(opt) {
+        opt.addEventListener('click', function() {
+          var pick = opt.dataset.option;
+          stage.classList.add('is-playing', 'has-selection');
+          options.forEach(function(o) { o.classList.toggle('is-active', o.dataset.option === pick); });
+          videos.forEach(function(v) {
+            if (v.dataset.option === pick) {
+              v.classList.add('is-active');
+              try { v.currentTime = 0; } catch (e) {}
+              var p = v.play(); if (p && p.catch) p.catch(function(){});
+            } else {
+              v.classList.remove('is-active');
+              v.pause();
+            }
+          });
+        });
+      });
+    });
+
+    // Tab switcher: clicking a tab activates its category, resets others.
+    var tabs = document.querySelectorAll('#physics-tabs .physics-tab');
+    var categories = document.querySelectorAll('#physics-categories .physics-category');
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var demo = tab.dataset.demo;
+        tabs.forEach(function(t) { t.classList.toggle('is-active', t.dataset.demo === demo); });
+        categories.forEach(function(c) {
+          var on = c.dataset.demo === demo;
+          c.classList.toggle('is-active', on);
+          if (!on) resetStage(c.querySelector('[data-stage]'));
+        });
+      });
+    });
+  })();
+
+  // SDE Generalizes: category tab switcher + comparison sliders.
+  (function() {
+    var tabs = document.querySelectorAll('#sde-tabs .sde-tab');
+    var categories = document.querySelectorAll('.sde-categories .sde-category');
+
+    // Bind sync listeners to a single bottom/top pair. Inactive scenes are
+    // display:none and paused, so their handlers won't fire — safe to attach
+    // listeners to every pair in a multi-scene slider.
+    function bindPairSync(bottom, top) {
+      var lastBottomTime = 0;
+      var driftSince = 0;
+      bottom.addEventListener('timeupdate', function() {
+        var t = bottom.currentTime;
+        if (t + 0.3 < lastBottomTime) {
+          try { top.currentTime = 0; } catch (e) {}
+          driftSince = 0;
+        } else {
+          var drift = Math.abs((top.currentTime || 0) - t);
+          if (drift > 1.0) {
+            if (!driftSince) { driftSince = performance.now(); }
+            if (performance.now() - driftSince > 600) {
+              try { top.currentTime = t; } catch (e) {}
+              driftSince = 0;
+            }
+          } else {
+            driftSince = 0;
+          }
+        }
+        lastBottomTime = t;
+      });
+      [bottom, top].forEach(function(v) {
+        v.addEventListener('loadedmetadata', function() { try { v.currentTime = 0; } catch (e) {} });
+      });
+    }
+
+    // Set up a comparison slider: synced playback + drag to move divider.
+    function setupSlider(slider) {
+      function setPos(pct) {
+        pct = Math.max(0, Math.min(100, pct));
+        slider.style.setProperty('--pos', pct + '%');
+      }
+      function posFromEvent(clientX) {
+        var r = slider.getBoundingClientRect();
+        return ((clientX - r.left) / r.width) * 100;
+      }
+
+      var dragging = false;
+      slider.addEventListener('pointerdown', function(e) {
+        // Ignore drags that start on a scene tab button.
+        if (e.target.closest('.scene-tab')) return;
+        dragging = true;
+        try { slider.setPointerCapture(e.pointerId); } catch (err) {}
+        setPos(posFromEvent(e.clientX));
+        e.preventDefault();
+      });
+      slider.addEventListener('pointermove', function(e) {
+        if (!dragging) return;
+        setPos(posFromEvent(e.clientX));
+      });
+      function endDrag(e) {
+        dragging = false;
+        try { if (e && e.pointerId != null) slider.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
+      slider.addEventListener('pointerup', endDrag);
+      slider.addEventListener('pointercancel', endDrag);
+
+      // Bind sync for every (bottom, top) pair present in this slider.
+      var bottoms = slider.querySelectorAll('.compare-bottom');
+      bottoms.forEach(function(b) {
+        var scene = b.dataset.scene;
+        var t = scene
+          ? slider.querySelector('.compare-top[data-scene="' + scene + '"]')
+          : slider.querySelector('.compare-top');
+        if (t) bindPairSync(b, t);
+      });
+
+      // Scene tab switching (multi-scene sliders only).
+      var sceneTabs = slider.querySelectorAll('.scene-tab');
+      sceneTabs.forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var scene = tab.dataset.scene;
+          slider.dataset.activeScene = scene;
+          sceneTabs.forEach(function(t) { t.classList.toggle('is-active', t === tab); });
+          // Pause all videos in slider, start the active scene's pair.
+          slider.querySelectorAll('video').forEach(function(v) {
+            if (v.dataset.scene === scene) {
+              v.preload = 'auto';
+              try { v.load(); } catch (err) {}
+              try { v.currentTime = 0; } catch (err) {}
+              var p = v.play(); if (p && p.catch) p.catch(function(){});
+            } else {
+              v.pause();
+              v.preload = 'none';
+            }
+          });
+        });
+      });
+    }
+
+    function playCategory(cat, on) {
+      cat.querySelectorAll('.compare-slider').forEach(function(s) {
+        var activeScene = s.dataset.activeScene; // undefined for single-scene sliders
+        s.querySelectorAll('video').forEach(function(v) {
+          // In multi-scene sliders, only act on the active scene's videos.
+          var isActive = !activeScene || v.dataset.scene === activeScene;
+          if (on && isActive) {
+            v.preload = 'auto';
+            try { v.load(); } catch (e) {}
+            try { v.currentTime = 0; } catch (e) {}
+            var p = v.play(); if (p && p.catch) p.catch(function(){});
+          } else {
+            v.pause();
+            v.preload = 'none';
+          }
+        });
+      });
+    }
+
+    // Initialize all sliders once (so synced timing works as soon as they autoplay).
+    document.querySelectorAll('.compare-slider').forEach(setupSlider);
+
+    // Start every non-active category with preload="none" so the active one
+    // gets full bandwidth. Active category will be promoted below.
+    categories.forEach(function(c) {
+      if (!c.classList.contains('is-active')) {
+        c.querySelectorAll('video').forEach(function(v) { v.preload = 'none'; });
+      }
+    });
+
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var cat = tab.dataset.cat;
+        tabs.forEach(function(t) { t.classList.toggle('is-active', t === tab); });
+        categories.forEach(function(c) {
+          var match = c.dataset.cat === cat;
+          c.classList.toggle('is-active', match);
+          playCategory(c, match);
+        });
+      });
+    });
+
+    // Autoplay the initially-active category.
+    categories.forEach(function(c) { if (c.classList.contains('is-active')) playCategory(c, true); });
+  })();
+</script>
+
+<script>
+  // Per-row loop synchronization for comparison grids.
+  // Strategy: pick first video as master per .results-grid. When master finishes a
+  // loop cycle (timeupdate jumps backward), reset any drifted siblings to master's
+  // currentTime. Only groups whose videos share the same duration participate, so
+  // mixed-duration rows (e.g., Stage 1 Dynamic) are untouched.
+  (function() {
+    var SYNC_THRESHOLD = 0.08;   // seconds — only seek when drift exceeds this
+    var LOOP_DETECT    = 0.2;    // seconds — backward jump that indicates a loop
+    var DUR_TOLERANCE  = 0.1;    // seconds — group eligibility check
+    var META_TIMEOUT   = 6000;   // ms
+
+    function waitMeta(v) {
+      if (!isNaN(v.duration) && v.duration > 0) return Promise.resolve();
+      return new Promise(function(resolve) {
+        var done = false;
+        function fin() { if (!done) { done = true; resolve(); } }
+        v.addEventListener('loadedmetadata', fin, { once: true });
+        v.addEventListener('durationchange', fin, { once: true });
+        setTimeout(fin, META_TIMEOUT);
+      });
+    }
+
+    function setupGrid(grid) {
+      var videos = Array.prototype.slice.call(grid.querySelectorAll('video'));
+      if (videos.length < 2) return;
+
+      Promise.all(videos.map(waitMeta)).then(function() {
+        var durations = videos.map(function(v) { return v.duration; });
+        if (durations.some(function(d) { return isNaN(d) || d <= 0; })) return;
+        var base = durations[0];
+        if (!durations.every(function(d) { return Math.abs(d - base) < DUR_TOLERANCE; })) return;
+
+        var master = videos[0];
+        var prev   = master.currentTime;
+
+        function syncOthers() {
+          var t = master.currentTime;
+          for (var i = 1; i < videos.length; i++) {
+            var v = videos[i];
+            if (v.readyState < 2) continue;
+            if (Math.abs(v.currentTime - t) > SYNC_THRESHOLD) {
+              try { v.currentTime = t; } catch (e) {}
+            }
+          }
+        }
+
+        master.addEventListener('timeupdate', function() {
+          if (master.currentTime < prev - LOOP_DETECT) syncOthers();
+          prev = master.currentTime;
+        });
+
+        // One delayed initial sync to align videos that finished buffering late.
+        setTimeout(syncOthers, 1500);
+      });
+    }
+
+    function init() {
+      document.querySelectorAll('.results-grid').forEach(setupGrid);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+</script>
+
 </body>
 </html>
