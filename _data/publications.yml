@@ -1,15 +1,17 @@
 main:
 
   - title: "3DPhysVideo: Consistency-Guided Flow SDE for Video Generation via 3D Scene Reconstruction and Physical Simulation"
-    authors: <b>Hwidong Kim*</b>, Yunho Kim*, Tae-Kyun Kim<br>(* equal contributions)
+    authors: <b>Hwidong Kim*</b>, Yunho Kim*, Tae-Kyun Kim<br>(* equal contribution)
     conference: Preprint 2026
     project: https://hwidong-kim.github.io/projects/3DPhysVideo/
+    paper: https://arxiv.org/abs/2605.16795
+    code: https://github.com/hwidong-kim/3DPhysVideo
     image: ./assets/img/3DPhysVideo.png
     
   - title: "DAFT-GAN: Dual Affine Transformation Generative Adversarial Network for Text-Guided Image Inpainting"
-    authors: Jihoon Lee*, Yunhong Min*, <b>Hwidong Kim*</b>, Sangtae Ahn<br>(* equal contributions)
+    authors: Jihoon Lee*, Yunhong Min*, <b>Hwidong Kim*</b>, Sangtae Ahn<br>(* equal contribution)
     conference: ACM MM 2024
     project: https://hwidong-kim.github.io/projects/DAFT-GAN/
-    pdf: ./assets/files/DAFT-GAN.pdf
+    paper: https://arxiv.org/abs/2408.04962
     code: https://github.com/hwidong-kim/DAFT-GAN
     image: ./assets/img/daft-gan.png
