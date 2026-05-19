@@ -16,7 +16,7 @@ My research interests lie in video generation, with a focus on producing physica
 - **[May. 2026]** <a href="https://arxiv.org/abs/2605.16795">3DPhysVideo</a> is now on arXiv!
 - **[Mar. 2025]** Started Master's Program at <a href="https://cs.kaist.ac.kr/">KAIST School of Computing</a> (Advisor: <a href="https://sites.google.com/view/tkkim/">Prof. Tae-Kyun (T-K) Kim</a>.)
 - **[Feb. 2025]** Joined <a href="https://sites.google.com/view/tkkim/">KCVL Lab</a> as a research intern.
-- **[Aug. 2024]** <a href="https://dl.acm.org/doi/abs/10.1145/3664647.3681662">DAFT-GAN</a> has been accepted at <b>ACM MM 2024!</b>
+- **[Aug. 2024]** <a href="https://arxiv.org/abs/2408.04962">DAFT-GAN</a> has been accepted at <b>ACM MM 2024!</b>
 - **[Jul. 2024]** Internship at <a href="https://visualai.kaist.ac.kr/">KAIST Visual AI Group</a>, led by <a href="https://mhsung.github.io/">Prof. Minhyuk Sung</a>.
 - **[Sep. 2023]** Joined <a href="https://knu-brainai.github.io/">KNU Brain AI Lab</a> as an undergraduate researcher. (Advisor: <a href="https://scholar.google.co.kr/citations?user=F-LXQwcAAAAJ&hl=ko">Prof. Sangtae Ahn</a>.)
 
