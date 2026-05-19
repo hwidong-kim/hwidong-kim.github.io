@@ -24,7 +24,7 @@
       {% if link.project %} 
       <a href="{{ link.project }}" class="btn btn-sm z-depth-0" role="button" target="_blank" style="font-size:12px;">Project</a>
       {% endif %}
-      {% if link.pdf %} 
+      {% if link.paper %} 
       <a href="{{ link.paper }}" class="btn btn-sm z-depth-0" role="button" target="_blank" style="font-size:12px;">Paper</a>
       {% endif %}
       {% if link.code %} 
